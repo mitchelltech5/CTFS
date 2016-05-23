@@ -141,7 +141,7 @@ void setup() {
 }
 
 void loop() {
-  // test
+
   waitcase();
   int temp;
   int input=SWread();
