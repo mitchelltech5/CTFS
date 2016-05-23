@@ -142,7 +142,7 @@ void setup() {
 
 void loop() {
    
-  //waitcase();
+  waitcase();
   int temp;
   int input=SWread();
  // Serial.println("\n\n\n\n\n\n\n\n\n");
