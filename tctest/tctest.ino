@@ -142,7 +142,7 @@ void setup() {
 
 void loop() {
    
-  waitcase();
+  //waitcase();
   int temp;
   int input=SWread();
  // Serial.println("\n\n\n\n\n\n\n\n\n");
@@ -655,7 +655,12 @@ void loop() {
           //  if(firstlayer==1){layersum=layersum-firstlayer; firstlayer=0;}
           Serial.print("LAYER TRAVEL: ");
             Serial.println(layersum);
-            Z[Zpos]=layersum*.515;          //Add current layer sum to Z array 
+           // Z[Zpos]=layersum*.515;          //Add current layer sum to Z array 
+            int MP=60;
+            int FR=2000;
+            int MT= layersum/MP;
+            Z[Zpos]=MT*FR/60;
+            
             layersum=0;                //Set layer Sum to 0 for next layer
             
             Serial.println(Z[Zpos]);
@@ -1111,6 +1116,8 @@ delay(200);
     if(thousands==8) mySerial.write(0x38);
     if(thousands==9) mySerial.write(0x39);
 
+    mySerial.write(0x2e);
+
     if(hundreds==0) mySerial.write(0x30);
     if(hundreds==1) mySerial.write(0x31);
     if(hundreds==2) mySerial.write(0x32);
@@ -1145,7 +1152,7 @@ delay(200);
     if(ones==9) mySerial.write(0x39);
 
   mySerial.write(0x20);
-  mySerial.write(0x75);
+  mySerial.write(0x6d);
   mySerial.write(0x6c);  
   mySerial.write(0x0D);
   mySerial.write(0x0A);
@@ -1250,6 +1257,8 @@ int pumpdis(int vol)
     if(thousands==8) mySerial.write(0x38);
     if(thousands==9) mySerial.write(0x39);
 
+    mySerial.write(0x2e);
+
     if(hundreds==0) mySerial.write(0x30);
     if(hundreds==1) mySerial.write(0x31);
     if(hundreds==2) mySerial.write(0x32);
@@ -1284,7 +1293,7 @@ int pumpdis(int vol)
     if(ones==9) mySerial.write(0x39);
 
   mySerial.write(0x20);
-  mySerial.write(0x75);
+  mySerial.write(0x6d);
   mySerial.write(0x6c);  
   mySerial.write(0x0D);
   mySerial.write(0x0A);
@@ -1418,7 +1427,7 @@ void waitcase(){
 
 void intstart(){
   delay(100);
-  
+  //INPUT
  mySerial.write(0x72);
  mySerial.write(0x61);
  mySerial.write(0x74);
@@ -1437,6 +1446,7 @@ void intstart(){
  mySerial.write(0x0A);
  
  delay(500);
+ //OUTPUT
  
  mySerial.write(0x72);
  mySerial.write(0x61);
@@ -1445,12 +1455,12 @@ void intstart(){
  mySerial.write(0x69);
  mySerial.write(0x20);
  mySerial.write(0x32);
- mySerial.write(0x30);
- //mySerial.write(0x20);
- mySerial.write(0x30);
- mySerial.write(0x30);
+// mySerial.write(0x30);
+// //mySerial.write(0x20);
+// mySerial.write(0x30);
+// mySerial.write(0x30);
  mySerial.write(0x20);
- mySerial.write(0x75);
+ mySerial.write(0x6d);
  mySerial.write(0x6c);
  mySerial.write(0x2f);
  mySerial.write(0x6d);
