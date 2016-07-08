@@ -6,12 +6,19 @@
 #include <SPI.h>    //Comm Libary for SD card
 #include <ctype.h>  //Custom Serial Interface Libary
 #include <PID_v1.h> //PID Libary
+#include <LiquidCrystal.h> //lcd Screen
+#include <Time.h>   //time Libary
 boolean tank1=false, tank2=false, syringe=false, purge=false, purge2=false, Sd=false, prnt=false, releas=false;  //Main Boolean Variables for tasks (run time Vars)
 boolean afterprint=false, afterques=false, aftercontin=false, aftersleep=false, aftersleep1=false, clean=false;
 boolean purgetemp=false, purge2temp=false, Sdtemp=false, prnttemp=false, autoh=false, gogo=false;                  //Secondary instance class Vars
 
+LiquidCrystal lcd(15, 14, 12, 11, 10, 9); //LCD DISPLAY
+long lastnow;
+long lastnow2;
+boolean error[40];
 int curlayer=0, maxlayer=0;    //Layer Height of Z
 float Z[100];                    //Zarray for vol ussage
+int total=0;
 
 Servo way3;        //Servo for 3 Way valve  
 Servo TK1;         //Servo for Tank 1
@@ -62,6 +69,20 @@ Pin 6 Tube 2 PID Output
 Pin 7 Tube 3 PID Output
 Pin 8 Cooling PID Output
 
+LCD SCREEN:
+ * LCD RS pin to digital pin 15
+ * LCD Enable pin to digital pin 14
+ * LCD D4 pin to digital pin 12
+ * LCD D5 pin to digital pin 11
+ * LCD D6 pin to digital pin 10
+ * LCD D7 pin to digital pin 9
+ * LCD R/W pin to ground
+ * LCD VSS pin to ground
+ * LCD VCC pin to 5V
+ * 10K resistor:
+ * ends to +5V and ground
+ * wiper to LCD VO pin (pin 3)
+
 pin 22 R1 3d printer comm
 pin 23 R2 3d printer comm
 pin 24 R3 3d printer comm
@@ -85,6 +106,13 @@ pin 53 SS Slave
 
 void setup() {
   // put your setup code here, to run once:
+  lcd.begin(16, 2);//LCD STARTUP
+  lcd.println("WELCOME TO CTFS!");
+  lcd.print("OK->Press Button");
+  lcd.setCursor(0,1);
+  lastnow=now();
+  delay(2000);
+  lcd.print("L <- Yes  No ->R");
   pinMode(2,OUTPUT);
   pinMode(3,OUTPUT);
   pinMode(4,OUTPUT);
@@ -141,8 +169,8 @@ void setup() {
 }
 
 void loop() {
-   
-  waitcase();
+  lcd.clear();
+ // waitcase();
   int temp;
   int input=SWread();
  // Serial.println("\n\n\n\n\n\n\n\n\n");
@@ -243,7 +271,7 @@ void loop() {
     Serial.println(temp);
     if(temp==48){
     
-      
+       
       prnt=true;
       purgetemp=false;
       purge2temp=false;
@@ -255,7 +283,6 @@ void loop() {
   }
   break;
   }
-  
   if(tank1==true)
   {
     Serial.println("TANK 1 ON");
@@ -265,6 +292,7 @@ void loop() {
     T1PID.Compute();    //PID Computation
     if(InputT1<150)       //SAFETY If under 150*F OUTPUT HEAT
     {
+      error[0]=false;
       if(Inside<SETT1)      //IF inside Temp is less than  TANK 1 SETPOINT
        {
         Serial.print("ELEMENT");
@@ -288,6 +316,8 @@ void loop() {
     else {
     digitalWrite(2,LOW);         // Output for tank 1 to Digital Pin 2
     Serial.println("TEMP SAFETY TANK1");
+    error[0]=true;
+    
     }
     //Debug Display
     Serial.print("Tank 1 Inside: "); Serial.print(Inside); Serial.print(" *F"); Serial.print("Output: "); Serial.print(OutputT1); Serial.print("PWM  Element Temp:"); Serial.print(InputT1); Serial.println("*F");
@@ -302,6 +332,7 @@ void loop() {
     T2PID.Compute();    //PID Computation
     if(InputT2<150)       //SAFETY If under 150*F OUTPUT HEAT
     {
+      error[1]=false;
       if(Inside<SETT2)      //IF inside Temp is less than  TANK 2 SETPOINT
        {
         Serial.print("ELEMENT");
@@ -325,6 +356,8 @@ void loop() {
     else {
     digitalWrite(3,LOW);         // Output for tank 2 to Digital Pin 3
     Serial.println("TEMP SAFETY TANK2");
+    error[1]=true;
+    
     }
     //Debug Display
     Serial.print("Tank 2 Inside: "); Serial.print(Inside); Serial.print(" *F"); Serial.print("Output: "); Serial.print(OutputT2); Serial.print("PWM  Element Temp:"); Serial.print(InputT2); Serial.println("*F");
@@ -337,6 +370,7 @@ void loop() {
     SPID.Compute();    //PID Computation
     if(InputS<150)       //SAFETY If under 150*F OUTPUT HEAT
     {
+     error[2]=false;
       if(InputS<SETS)      //IF inside Temp is less than  SYRINGE SETPOINT
        {
         Serial.print("ELEMENT");
@@ -360,6 +394,8 @@ void loop() {
     else {
     digitalWrite(4,LOW);         // Output for Syringe to Digital Pin 4
     Serial.println("TEMP SAFETY Syringe");
+    error[2]=true;
+    
     }
     //Debug Display
     Serial.print("Syringe Temp: "); Serial.print(InputS); Serial.print(" *F"); Serial.print("Output: "); Serial.print(OutputS); Serial.println("PWM"); 
@@ -369,6 +405,7 @@ void loop() {
     L1PID.Compute();    //PID Computation
     if(InputL1<150)       //SAFETY If under 150*F OUTPUT HEAT
     {
+      error[3]=false;
       if(InputL1<SETL1)      //IF inside Temp is less than  Tube 1 (L1) SETPOINT
        {
         Serial.print("ELEMENT");
@@ -392,6 +429,8 @@ void loop() {
     else {
     digitalWrite(5,LOW);         // Output for Tube 1 (L1) to Digital Pin 5
     Serial.println("TEMP SAFETY Line 1");
+    
+    error[3]=true;
     }
     //Debug Display
     Serial.print("Tube 1 Temp: "); Serial.print(InputL1); Serial.print(" *F"); Serial.print("Output: "); Serial.print(OutputL1); Serial.println("PWM"); 
@@ -401,6 +440,7 @@ void loop() {
     L2PID.Compute();    //PID Computation
     if(InputL2<150)       //SAFETY If under 150*F OUTPUT HEAT
     {
+      error[4]=false;
       if(InputL2<SETL2)      //IF inside Temp is less than  Tube 2 (L2) SETPOINT
        {
         Serial.print("ELEMENT");
@@ -424,6 +464,8 @@ void loop() {
     else {
     digitalWrite(6,LOW);         // Output for Tube 2 (L2) to Digital Pin 6
     Serial.println("TEMP SAFETY Tube 2");
+    
+    error[4]=true;
     }
     //Debug Display
     Serial.print("Tube 2 Temp: "); Serial.print(InputL2); Serial.print(" *F"); Serial.print("Output: "); Serial.print(OutputL2); Serial.println("PWM"); 
@@ -434,6 +476,7 @@ void loop() {
     L3PID.Compute();    //PID Computation
     if(InputL3<150)       //SAFETY If under 150*F OUTPUT HEAT
     {
+      error[5]=false;
       if(InputL3<SETL3)      //IF inside Temp is less than  Tube 3 (L3) SETPOINT
        {
         Serial.print("ELEMENT");
@@ -457,6 +500,8 @@ void loop() {
     else {
     digitalWrite(7,LOW);         // Output for Tube 3 (L3) to Digital Pin 7
     Serial.println("TEMP SAFETY Tube 3");
+    
+    error[5]=true;
     }
     //Debug Display
     Serial.print("Tube 3 Temp: "); Serial.print(InputL3); Serial.print(" *F"); Serial.print("Output: "); Serial.print(OutputL3); Serial.println("PWM"); 
@@ -466,6 +511,7 @@ void loop() {
     CPID.Compute();    //PID Computation
    if(InputC<150)       //SAFETY If under 150*F OUTPUT HEAT
     {
+      error[6]=false;
       if(InputC>SETC)      //IF inside Temp is Greater than  Chamber SETPOINT
        {
         Serial.print("ELEMENT");
@@ -489,6 +535,8 @@ void loop() {
     else {
     digitalWrite(8,LOW);         // Output for Chanber to Digital Pin 8
     Serial.println("TEMP SAFETY Chamber");
+    
+    error[6]=true;
     }
     //Debug Display
     Serial.print("Chamber Temp: "); Serial.print(InputC); Serial.print(" *F"); Serial.print("Output: "); Serial.print(OutputC); Serial.println("PWM"); 
@@ -558,14 +606,18 @@ void loop() {
    File root;          //Root file of SD card root
    if (!SD.begin(53)) {    //initialize SD card CS pin 10
    Serial.println("initialization failed!");
+    
+    error[7]=true;
    return;
    }
    Serial.println("initialization done.");
+   error[7]=false;
   // root = SD.open("/");              //open Root
   // myFile= root.openNextFile(); //open first .txt file on card
    myFile = SD.open("Part1.txt", FILE_READ);
    if (myFile) {                      //if file can be opened
     Serial.print("READING");
+
    while (myFile.available()) {
         char a;
     	//Serial.write(a);
@@ -662,7 +714,7 @@ void loop() {
             Z[Zpos]=MT*FR/60;
             
             layersum=0;                //Set layer Sum to 0 for next layer
-            
+            total=total+Z[Zpos];
             Serial.println(Z[Zpos]);
             Zpos++;                    //increment Zpos to next layer
             
@@ -675,9 +727,11 @@ void loop() {
      root.close();         //Close files
    maxlayer=Zpos-1;
    Serial.println("done With SD Card");
+   error[8]=false;
   } else {
     // if the file didn't open, print an error:
     Serial.println("error opening File On SD Card");
+    error[8]=true;
   }
    
    
@@ -1053,7 +1107,8 @@ void  dirchange(int angle){
 }
 int pumpchg(int vol)
 {
-  
+  lcd.setCursor(0,1);
+    lcd.print("<");
   
   int ones = (vol%10);
   int tens = ((vol/10)%10);
@@ -1063,7 +1118,7 @@ int pumpchg(int vol)
   Serial.print("  "); Serial.print(tens); Serial.print("  ");
   Serial.println(ones);
   
-  if(curvol+vol>maxvol){Serial.println("ABOVE MAX"); return 0;}
+  if(curvol+vol>maxvol){Serial.println("ABOVE MAX"); return 0; error[10]=true;}error[10]=false;
 delay(200);
   mySerial.write(0x6d);
   mySerial.write(0x6f);
@@ -1165,7 +1220,13 @@ delay(200);
   curvol=curvol+vol;
   Serial.println(curvol);
   //DEBUG ONLY
-  while (mySerial.available()==false);
+  //while (mySerial.available()==false); //*******DISABLED  MAY NEED TO RE-ENABLE*******
+
+  lastnow=now();
+  while((mySerial.available()==false)||(now()<lastnow+5));
+  if((mySerial.available()==false)) error[12]=true;
+  else
+  error[12]=false;
 
   while (mySerial.available()) {
     char in=mySerial.read();
@@ -1191,7 +1252,7 @@ delay(200);
         char in=mySerial.read(); 
         Serial.print(in);
          if((in=='6')||(in=='7')){
-          Serial.println("STALL ERROR!!");pumpstop(); return 0;}
+          Serial.println("STALL ERROR!!");pumpstop(); return 0; error[9]=true;}error[9]=false;
         if((in=='<')||(in=='>')){Serial.println("PUMP RUNNING");
           ch=1;}
         if(ch==1)
@@ -1211,6 +1272,8 @@ return 1;
 
 int pumpdis(int vol)
 { 
+  lcd.setCursor(0,1);
+    lcd.print(">");
   gogo=false;
   int ones = (vol%10);
   int tens = ((vol/10)%10);
@@ -1220,7 +1283,7 @@ int pumpdis(int vol)
   Serial.print("  "); Serial.print(tens); Serial.print("  ");
   Serial.println(ones);
   
-  if(curvol-vol<0){Serial.println("NEG VOLUME"); return 0;}
+  if(curvol-vol<0){Serial.println("NEG VOLUME"); return 0; error[11]=true;}error[11]=false;
 
    mySerial.write(0x6d);
   mySerial.write(0x6f);
@@ -1233,12 +1296,12 @@ int pumpdis(int vol)
 
   /* DEBUG ONLY
   while (mySerial.available()==false);
-
+  
   while (mySerial.available()) {
     char in=mySerial.read();
     Serial.print(in);} */
   delay(200);
-
+  
   
   
   mySerial.write(0x76);
@@ -1300,7 +1363,13 @@ int pumpdis(int vol)
   curvol=curvol-vol;
   Serial.println(curvol);
   //DEBUG ONLY
-  while (mySerial.available()==false);
+  //while (mySerial.available()==false);   ****DISABLED MAY NEED TO RE-ENABLE******
+
+  lastnow=now();
+  while((mySerial.available()==false)||(now()<lastnow+5));
+  if((mySerial.available()==false)) error[12]=true;
+  else
+  error[12]=false;
 
   while (mySerial.available()) {
     char in=mySerial.read();
@@ -1326,7 +1395,13 @@ int pumprun()
   mySerial.write(0x0A);
   delay(100);
   
-  while (mySerial.available()==false);
+  //while (mySerial.available()==false);   ***(DISABLED MAY NEED TO RE-ENABLE****
+
+  lastnow=now();
+  while((mySerial.available()==false)||(now()<lastnow+5));
+  if((mySerial.available()==false)) error[12]=true;
+  else
+  error[12]=false;
 
   while (mySerial.available()) {
     char in=mySerial.read();
@@ -1356,7 +1431,7 @@ int pumprun()
           mySerial.write(0x70);
           mySerial.write(0x0D);
         return 0;
-        }
+        error[9]=true;}error[9]=false;
       }
     }
   }
@@ -1408,16 +1483,23 @@ void waitcase(){
        mySerial.write(0x0D);
        mySerial.write(0x0A);
        delay(200);
-      while (mySerial.available()==false);
+     // while (mySerial.available()==false);     *****DISABLED MAY NEED TO RE-ENABLE********
+     lastnow=now();
+       while((mySerial.available()==false)||(now()<lastnow+5));
+      if((mySerial.available()==false)) error[12]=true;
+      else
+      error[12]=false;
+      
       int ch=0;
       while (mySerial.available()) {
         char in=mySerial.read();
         Serial.print(in);
          if((in=='6')||(in=='7')){
-          Serial.println("STALL ERROR!!");pumpstop();}
+          Serial.println("STALL ERROR!!");pumpstop(); error[9]=true;}error[9]=false;
         if((in=='<')||(in=='>')){Serial.println("PUMP RUNNING");
           ch=1; gogo=false;}
-        if(in==':') {Serial.println("PUMP STOPPED"); gogo=true;}
+        if(in==':') {Serial.println("PUMP STOPPED"); lcd.setCursor(0,1);
+    lcd.print(":");gogo=true;}
         if(ch==1)
         check=0;
         else check=1;
@@ -1473,7 +1555,7 @@ void intstart(){
   
 void heat(){
 
-   if(tank1==true)
+  if(tank1==true)
   {
     Serial.println("TANK 1 ON");
      TK1.write(0);      //Rotate in 1 direction
@@ -1482,6 +1564,7 @@ void heat(){
     T1PID.Compute();    //PID Computation
     if(InputT1<150)       //SAFETY If under 150*F OUTPUT HEAT
     {
+      error[0]=false;
       if(Inside<SETT1)      //IF inside Temp is less than  TANK 1 SETPOINT
        {
         Serial.print("ELEMENT");
@@ -1505,6 +1588,8 @@ void heat(){
     else {
     digitalWrite(2,LOW);         // Output for tank 1 to Digital Pin 2
     Serial.println("TEMP SAFETY TANK1");
+    error[0]=true;
+    
     }
     //Debug Display
     Serial.print("Tank 1 Inside: "); Serial.print(Inside); Serial.print(" *F"); Serial.print("Output: "); Serial.print(OutputT1); Serial.print("PWM  Element Temp:"); Serial.print(InputT1); Serial.println("*F");
@@ -1519,6 +1604,7 @@ void heat(){
     T2PID.Compute();    //PID Computation
     if(InputT2<150)       //SAFETY If under 150*F OUTPUT HEAT
     {
+      error[1]=false;
       if(Inside<SETT2)      //IF inside Temp is less than  TANK 2 SETPOINT
        {
         Serial.print("ELEMENT");
@@ -1542,6 +1628,8 @@ void heat(){
     else {
     digitalWrite(3,LOW);         // Output for tank 2 to Digital Pin 3
     Serial.println("TEMP SAFETY TANK2");
+    error[1]=true;
+    
     }
     //Debug Display
     Serial.print("Tank 2 Inside: "); Serial.print(Inside); Serial.print(" *F"); Serial.print("Output: "); Serial.print(OutputT2); Serial.print("PWM  Element Temp:"); Serial.print(InputT2); Serial.println("*F");
@@ -1554,6 +1642,7 @@ void heat(){
     SPID.Compute();    //PID Computation
     if(InputS<150)       //SAFETY If under 150*F OUTPUT HEAT
     {
+     error[2]=false;
       if(InputS<SETS)      //IF inside Temp is less than  SYRINGE SETPOINT
        {
         Serial.print("ELEMENT");
@@ -1577,6 +1666,8 @@ void heat(){
     else {
     digitalWrite(4,LOW);         // Output for Syringe to Digital Pin 4
     Serial.println("TEMP SAFETY Syringe");
+    error[2]=true;
+    
     }
     //Debug Display
     Serial.print("Syringe Temp: "); Serial.print(InputS); Serial.print(" *F"); Serial.print("Output: "); Serial.print(OutputS); Serial.println("PWM"); 
@@ -1586,6 +1677,7 @@ void heat(){
     L1PID.Compute();    //PID Computation
     if(InputL1<150)       //SAFETY If under 150*F OUTPUT HEAT
     {
+      error[3]=false;
       if(InputL1<SETL1)      //IF inside Temp is less than  Tube 1 (L1) SETPOINT
        {
         Serial.print("ELEMENT");
@@ -1609,6 +1701,8 @@ void heat(){
     else {
     digitalWrite(5,LOW);         // Output for Tube 1 (L1) to Digital Pin 5
     Serial.println("TEMP SAFETY Line 1");
+    
+    error[3]=true;
     }
     //Debug Display
     Serial.print("Tube 1 Temp: "); Serial.print(InputL1); Serial.print(" *F"); Serial.print("Output: "); Serial.print(OutputL1); Serial.println("PWM"); 
@@ -1618,6 +1712,7 @@ void heat(){
     L2PID.Compute();    //PID Computation
     if(InputL2<150)       //SAFETY If under 150*F OUTPUT HEAT
     {
+      error[4]=false;
       if(InputL2<SETL2)      //IF inside Temp is less than  Tube 2 (L2) SETPOINT
        {
         Serial.print("ELEMENT");
@@ -1641,6 +1736,8 @@ void heat(){
     else {
     digitalWrite(6,LOW);         // Output for Tube 2 (L2) to Digital Pin 6
     Serial.println("TEMP SAFETY Tube 2");
+    
+    error[4]=true;
     }
     //Debug Display
     Serial.print("Tube 2 Temp: "); Serial.print(InputL2); Serial.print(" *F"); Serial.print("Output: "); Serial.print(OutputL2); Serial.println("PWM"); 
@@ -1651,6 +1748,7 @@ void heat(){
     L3PID.Compute();    //PID Computation
     if(InputL3<150)       //SAFETY If under 150*F OUTPUT HEAT
     {
+      error[5]=false;
       if(InputL3<SETL3)      //IF inside Temp is less than  Tube 3 (L3) SETPOINT
        {
         Serial.print("ELEMENT");
@@ -1674,6 +1772,8 @@ void heat(){
     else {
     digitalWrite(7,LOW);         // Output for Tube 3 (L3) to Digital Pin 7
     Serial.println("TEMP SAFETY Tube 3");
+    
+    error[5]=true;
     }
     //Debug Display
     Serial.print("Tube 3 Temp: "); Serial.print(InputL3); Serial.print(" *F"); Serial.print("Output: "); Serial.print(OutputL3); Serial.println("PWM"); 
@@ -1683,6 +1783,7 @@ void heat(){
     CPID.Compute();    //PID Computation
    if(InputC<150)       //SAFETY If under 150*F OUTPUT HEAT
     {
+      error[6]=false;
       if(InputC>SETC)      //IF inside Temp is Greater than  Chamber SETPOINT
        {
         Serial.print("ELEMENT");
@@ -1706,6 +1807,8 @@ void heat(){
     else {
     digitalWrite(8,LOW);         // Output for Chanber to Digital Pin 8
     Serial.println("TEMP SAFETY Chamber");
+    
+    error[6]=true;
     }
     //Debug Display
     Serial.print("Chamber Temp: "); Serial.print(InputC); Serial.print(" *F"); Serial.print("Output: "); Serial.print(OutputC); Serial.println("PWM"); 
@@ -1713,4 +1816,113 @@ void heat(){
     
   }
 }
+
+
+void lcd_display()
+{
+    if(now()>lastnow+2)
+    {
+      int testerr=0;
+      for(int x=0; x<14; x++)
+      if(error[x]==true) testerr=1;
+      
+      if(testerr==0){
+        if((tank1!=true)&&(tank2!=true)&&(syringe!=true)&&(releas!=true)&&(aftercontin!=true))
+        lcd.println("Tank 1 (OK)");
+
+        if((tank1==true)&&(tank2!=true)&&(syringe!=true)&&(releas!=true)&&(aftercontin!=true))
+        lcd.println("Tank 2 (OK)");
+
+        if((tank1==true)&&(tank2==true)&&(syringe!=true)&&(releas!=true)&&(aftercontin!=true))
+        lcd.println("Syr & Lines (OK)");
+
+        if((tank1==true)&&(tank2==true)&&(syringe==true)&&(releas!=true)&&(aftercontin!=true))  
+        if((purgetemp!=true)&&(Sdtemp!=true)&&(prnttemp!=true))  
+        lcd.println("First Purge (OK)");  
+        
+        if((tank1==true)&&(tank2==true)&&(syringe==true)&&(releas!=true)&&(aftercontin!=true))  
+        if((purgetemp==true)&&(purge2temp!=true)&&(Sdtemp!=true)&&(prnttemp!=true))
+        lcd.println("Sec Purge (OK)");
+        
+        if((tank1==true)&&(tank2==true)&&(syringe==true)&&(releas!=true)&&(aftercontin!=true))  
+        if((purgetemp==true)&&(purge2temp==true)&&(Sdtemp!=true)&&(prnttemp!=true))
+        lcd.println("Read Sd  (OK)");
+
+        if((tank1==true)&&(tank2==true)&&(syringe==true)&&(releas!=true)&&(aftercontin!=true))  
+        if((purgetemp==true)&&(purge2temp==true)&&(Sdtemp==true)&&(prnttemp!=true))
+        lcd.println("Plate&Noz (OK)");
+        lcd.print("VOL="); lcd.println(total);
+
+        if(prnt==true)
+        lcd.print("Layer=");lcd.println(curlayer);
+
+        if(afterprint==true)
+        lcd.println("Print Finished");
+      }
+      else
+      {
+        
+          if(error[0]) {lcd.println("ERR: OH2"); lcd.println(tempread(1)); }
+          if(error[1]) {lcd.println("ERR: OH3"); lcd.println(tempread(3)); }
+          if(error[2]) {lcd.println("ERR: OH4"); lcd.println(tempread(4)); }
+          if(error[3]) {lcd.println("ERR: OH5"); lcd.println(tempread(5)); }
+          if(error[4]) {lcd.println("ERR: OH6"); lcd.println(tempread(6)); }
+          if(error[5]) {lcd.println("ERR: OH7"); lcd.println(tempread(7)); }
+          if(error[6]) {lcd.println("ERR: OH8"); lcd.println(tempread(8)); }
+          if(error[7]) {lcd.println("ERR: SD CARD INT");  }
+          if(error[8]) {lcd.println("ERR: FILEREAD");  }
+          if(error[9]) {lcd.println("ERR: STALL KO");  }
+          if(error[10]) {lcd.println("ERR: VOL AM KO");  }
+          if(error[11]) {lcd.println("ERR: VOL Neg KO");  }
+          if(error[12]) {lcd.println("ERR: PumpCOM KO");  }
+          if(error[13]) {lcd.println("ERR: PumpSTOP KO");  }
+          
+          
+        
+      }
+        if((tank1==true)&&(tank2==true)&&(syringe==true)&&(releas!=true)&&(aftercontin!=true))  
+        if((purgetemp==true)&&(purge2temp==true)&&(Sdtemp==true)&&(prnttemp!=true)) ;
+        else
+        {
+          if(((second(now())>=0)&&(second(now())<=2))||((second(now())>=18)&&(second(now())<=20)) ||((second(now())>=36)&&(second(now())<=38)) ||((second(now())>=54)&&(second(now())<=55))   )
+          {
+          lcd.setCursor(1,1);
+          lcd.print("T1:");lcd.print(tempread(1));lcd.print("T2:");lcd.print(tempread(3));
+          lcd.print("S:");lcd.print(tempread(4));
+          }
+          if(((second(now())>=3)&&(second(now())<=5)) ||((second(now())>=21)&&(second(now())<=23))||((second(now())>=39)&&(second(now())<=41)) ||((second(now())>=56)&&(second(now())<=57))  )
+          {
+          lcd.setCursor(1,1);
+          lcd.print("T2:");lcd.print(tempread(3));lcd.print("S:");lcd.print(tempread(4));
+          lcd.print("L1:");lcd.print(tempread(5));
+          }
+          if(((second(now())>=6)&&(second(now())<=8)) ||((second(now())>=24)&&(second(now())<=26)) ||((second(now())>=42)&&(second(now())<=44))  ||((second(now())>=58)&&(second(now())<=59))  )
+          {
+          lcd.setCursor(1,1);
+          lcd.print("S:");lcd.print(tempread(4));lcd.print("L1:");lcd.print(tempread(5));
+          lcd.print("L2:");lcd.print(tempread(6));
+          }
+          if(((second(now())>=9)&&(second(now())<=11)) ||((second(now())>=27)&&(second(now())<=29)) ||((second(now())>=45)&&(second(now())<=47))  ||((second(now())>=60))  )
+          {
+          lcd.setCursor(1,1);
+          lcd.print("L1:");lcd.print(tempread(5));lcd.print("L2:");lcd.print(tempread(6));
+          lcd.print("L3:");lcd.print(tempread(7));
+          }
+          if(((second(now())>=12)&&(second(now())<=14)) ||((second(now())>=30)&&(second(now())<=32)) ||((second(now())>=48)&&(second(now())<=50))   )
+          {
+          lcd.setCursor(1,1);
+          lcd.print("L2:");lcd.print(tempread(6));lcd.print("L3:");lcd.print(tempread(7));
+          lcd.print("T1:");lcd.print(tempread(1));
+          }
+          if(((second(now())>=15)&&(second(now())<=17)) ||((second(now())>=33)&&(second(now())<=35)) ||((second(now())>=51)&&(second(now())<=53))   )
+          {
+          lcd.setCursor(1,1);
+          lcd.print("L3:");lcd.print(tempread(7));lcd.print("T1:");lcd.print(tempread(1));
+          lcd.print("T2:");lcd.print(tempread(3));
+          }
+        }
+      
+}
+}
+
 
