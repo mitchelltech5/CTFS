@@ -170,6 +170,7 @@ void setup() {
 
 void loop() {
   lcd.clear();
+  lcd_display();
  // waitcase();
   int temp;
   int input=SWread();
@@ -1822,6 +1823,7 @@ void lcd_display()
 {
     if(now()>lastnow+2)
     {
+      lastnow=now();
       int testerr=0;
       for(int x=0; x<14; x++)
       if(error[x]==true) testerr=1;
